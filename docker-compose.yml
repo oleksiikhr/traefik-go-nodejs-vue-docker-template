@@ -1,0 +1,125 @@
+version: '3'
+
+services:
+  traefik:
+    image: traefik:v2.3
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command:
+      - --log.level=INFO
+      - --api.insecure=true
+      - --providers.docker=true
+      - --entrypoints.web.address=:80
+    networks:
+      - backend
+      - frontend
+    ports:
+      - 80:80
+      - 8080:8080
+
+  vue:
+    image: node:15.4-alpine
+    working_dir: /usr/app
+    command: sh -c "yarn && yarn dev --port=80"
+    volumes:
+      - ./vue:/usr/app
+    networks:
+      - frontend
+    labels:
+      - traefik.http.routers.vue.rule=Host(`${DOCKER_DOMAIN}`)
+      - traefik.http.routers.vue.entrypoints=web
+    expose:
+      - 80
+
+  node:
+    image: node:15.4-alpine
+    working_dir: /usr/app
+    command: sh -c "yarn global add nodemon && yarn && yarn watch"
+    volumes:
+      - ./node:/usr/app
+    networks:
+      - backend
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    expose:
+      - 3000
+
+  go:
+    build:
+      context: ./go
+      dockerfile: Dockerfile
+    volumes:
+      - ./go:/app
+    networks:
+      - backend
+    depends_on:
+      mysql:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    labels:
+      - traefik.http.routers.go.rule=Host(`${DOCKER_DOMAIN}`) && PathPrefix(`/api`)
+      - traefik.http.routers.go.entrypoints=web
+    expose:
+      - 8081
+
+  mysql:
+    image: mysql:8.0
+    environment:
+      - MYSQL_DATABASE=${DB_DATABASE}
+      - MYSQL_USER=${DB_USERNAME}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+    volumes:
+      - ${DOCKER_DATA_PATH}/mysql:/var/lib/mysql
+    networks:
+      - backend
+
+  redis:
+    image: redis:6.0-alpine
+    command: redis-server
+    volumes:
+      - ${DOCKER_DATA_PATH}/redis:/data
+    networks:
+      - backend
+
+  rabbitmq:
+    image: rabbitmq:3.8-management-alpine
+    volumes:
+      - ${DOCKER_DATA_PATH}/rabbitmq:/var/lib/rabbitmq
+    labels:
+      - traefik.http.routers.rabbitmq.rule=Host(`rabbitmq.localhost`)
+      - traefik.http.services.rabbitmq.loadbalancer.server.port=15672
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "5672"]
+      timeout: 5s
+      retries: 1
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:5.0
+    environment:
+      - PMA_HOST=mysql
+      - MYSQL_USER=${DB_USERNAME}
+      - MYSQL_PASSWORD=${DB_PASSWORD}
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
+    labels:
+      - traefik.http.routers.phpmyadmin.rule=Host(`phpmyadmin.localhost`)
+    networks:
+      - backend
+
+  maildev:
+    image: djfarrelly/maildev
+    labels:
+      - traefik.http.routers.maildev.rule=Host(`maildev.localhost`)
+      - traefik.http.services.maildev.loadbalancer.server.port=80
+    networks:
+      - backend
+
+networks:
+  backend:
+  frontend:
