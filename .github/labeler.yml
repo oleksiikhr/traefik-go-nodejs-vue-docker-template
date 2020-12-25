@@ -1,0 +1,23 @@
+go:
+  - go/**/*
+
+vue:
+  - vue/**/*
+
+node:
+  - node/**/*
+
+docs:
+  - ./**/*.md
+
+test:
+  - ./**/*.spec.js
+  - ./**/*_test.go
+
+docker:
+  - Dockerfile
+  - docker-*.yml
+  - .docker/**/*
+
+github:
+  - .github/**/*
