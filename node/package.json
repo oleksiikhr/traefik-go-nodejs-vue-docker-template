@@ -7,6 +7,6 @@
     "watch": "nodemon main.js"
   },
   "dependencies": {
-    "amqplib": "^0.6.0"
+    "amqplib": "^0.7.0"
   }
 }
