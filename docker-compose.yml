@@ -18,7 +18,7 @@ services:
       - 8080:8080
 
   vue:
-    image: node:15.4-alpine
+    image: node:15.11-alpine
     working_dir: /usr/app
     command: sh -c "yarn && yarn dev --port=80"
     volumes:
@@ -32,9 +32,10 @@ services:
       - 80
 
   node:
-    image: node:15.4-alpine
+    image: node:15.11-alpine
     working_dir: /usr/app
     command: sh -c "yarn global add nodemon && yarn && yarn watch"
+    user: "1000"
     volumes:
       - ./node:/usr/app
     networks:
